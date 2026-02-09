@@ -47,7 +47,7 @@ function HomePage() {
   
   // ייצוא Excel - States
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportType, setExportType] = useState<'all' | 'institutions' | 'groups' | 'dates' | ''>('')
+  const [exportType, setExportType] = useState<'all' | 'institutions' | 'groups' | 'dates'>('all')
   const [showExportSelectModal, setShowExportSelectModal] = useState(false)
   const [selectedExportInstitutions, setSelectedExportInstitutions] = useState<string[]>([])
   const [selectedExportGroups, setSelectedExportGroups] = useState<string[]>([])
@@ -117,7 +117,6 @@ function HomePage() {
       toast.success('מוסד עודכן בהצלחה')
       setShowModal(false)
       setEditingId(null)
-      setEditingName('')
     },
     onError: (error: any) => {
       toast.error('שגיאה בעדכון מוסד: ' + error.message)
@@ -358,14 +357,12 @@ function HomePage() {
   
   const handleOpenAddModal = () => {
     setEditingId(null)
-    setEditingName('')
     setNewName('')
     setShowModal(true)
   }
   
   const handleOpenEditModal = (inst: any) => {
     setEditingId(inst.id)
-    setEditingName(inst.name)
     setNewName(inst.name)
     setShowModal(true)
   }

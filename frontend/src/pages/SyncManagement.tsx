@@ -360,7 +360,7 @@ export function SyncManagementPage() {
             {/* כפתור סנכרון ידני */}
             <button
               className="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 font-semibold flex items-center justify-center gap-2"
-              onClick={() => toast.info('סנכרון ידני יתווסף בהמשך')}
+              onClick={() => toast('סנכרון ידני יתווסף בהמשך', { icon: 'ℹ️' })}
             >
               🔄 סנכרן עכשיו (ידני)
             </button>

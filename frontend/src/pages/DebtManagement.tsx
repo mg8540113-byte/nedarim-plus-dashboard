@@ -11,7 +11,6 @@ import { formatCurrency } from '../utils/calculations'
 
 function DebtOverviewPage() {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   
   // שליפת כל המוסדות (כולל אלה ללא חוב)
   const { data: institutions } = useQuery({

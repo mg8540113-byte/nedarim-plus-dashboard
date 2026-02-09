@@ -128,7 +128,7 @@ export function VoucherPrintView({ vouchers }: VoucherPrintViewProps) {
         }
       `}</style>
       
-      {vouchers.map((voucher, index) => (
+      {vouchers.map((voucher) => (
         <div key={voucher.id} className="voucher-item border-2 border-gray-300 flex flex-col">
           {/* כותרת עליונה - לוגו */}
           <div className="bg-[#F5F1E8] border-b-2 border-gray-300 py-3 text-center">

@@ -1,6 +1,5 @@
 import * as XLSX from 'xlsx'
 import { supabase } from './supabase'
-import { formatCurrency } from './calculations'
 import toast from 'react-hot-toast'
 
 // ============================================

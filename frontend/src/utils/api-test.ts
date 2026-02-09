@@ -51,7 +51,7 @@ export async function testServerConnection(
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 שניות timeout
     
     try {
-      const response = await fetch(baseUrl, {
+      await fetch(baseUrl, {
         method: 'HEAD',
         signal: controller.signal,
         mode: 'no-cors' // חשוב! כי אין לנו CORS headers מהשרת
