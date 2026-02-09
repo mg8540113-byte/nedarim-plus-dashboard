@@ -28,7 +28,6 @@ function HomePage() {
   const [showExcelPreviewModal, setShowExcelPreviewModal] = useState(false)
   const [showExcelModal, setShowExcelModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
   const [newName, setNewName] = useState('')
   const [excelData, setExcelData] = useState<any[]>([])
   const [excelError, setExcelError] = useState('')
@@ -173,7 +172,6 @@ function HomePage() {
         
         const firstRow: any = data[0]
         const requiredColumns = ['שם לקוח', 'סכום ששולם', 'קבוצה']
-        const optionalColumns = ['טלפון', 'תעודת זהות']
         
         // בדיקת עמודות חובה
         const missingColumns = requiredColumns.filter(col => !(col in firstRow))
