@@ -13,12 +13,12 @@ import type { Transaction, Voucher } from '../types'
 export function generateVoucherId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let result = ''
-  
+
   for (let i = 0; i < 11; i++) {
     const randomIndex = Math.floor(Math.random() * chars.length)
     result += chars[randomIndex]
   }
-  
+
   return result
 }
 
@@ -41,7 +41,7 @@ export async function createVouchersForTransaction(
 ): Promise<Voucher[]> {
   const vouchersToCreate: Omit<Voucher, 'id' | 'created_at' | 'updated_at'>[] = []
   let sortOrder = 0
-  
+
   // יצירת תלושים של 200₪
   for (let i = 0; i < transaction.vouchers_200; i++) {
     vouchersToCreate.push({
@@ -53,7 +53,7 @@ export async function createVouchersForTransaction(
       sort_order: sortOrder++
     })
   }
-  
+
   // יצירת תלושים של 150₪
   for (let i = 0; i < transaction.vouchers_150; i++) {
     vouchersToCreate.push({
@@ -65,7 +65,7 @@ export async function createVouchersForTransaction(
       sort_order: sortOrder++
     })
   }
-  
+
   // יצירת תלושים של 100₪
   for (let i = 0; i < transaction.vouchers_100; i++) {
     vouchersToCreate.push({
@@ -77,7 +77,7 @@ export async function createVouchersForTransaction(
       sort_order: sortOrder++
     })
   }
-  
+
   // יצירת תלושים של 50₪
   for (let i = 0; i < transaction.vouchers_50; i++) {
     vouchersToCreate.push({
@@ -89,23 +89,107 @@ export async function createVouchersForTransaction(
       sort_order: sortOrder++
     })
   }
-  
+
   // אם אין תלושים ליצור - החזר מערך ריק
   if (vouchersToCreate.length === 0) {
     return []
   }
-  
+
   // שמירה ב-DB
   const { data, error } = await supabase
     .from('vouchers')
     .insert(vouchersToCreate)
     .select()
-  
+
   if (error) {
     console.error('Error creating vouchers:', error)
     throw new Error(`Failed to create vouchers: ${error.message}`)
   }
-  
+
+  return data || []
+}
+
+/**
+ * יצירת תלושים פיזיים למספר עסקאות (Batch)
+ * מקבל מערך עסקאות ויוצר את כל התלושים במכה אחת
+ * 
+ * @param transactions - מערך העסקאות שעבורן ליצור תלושים
+ * @returns מערך של כל התלושים שנוצרו
+ */
+export async function createVouchersForTransactions(
+  transactions: Transaction[]
+): Promise<Voucher[]> {
+  const allVouchers: Omit<Voucher, 'id' | 'created_at' | 'updated_at'>[] = []
+
+  // איסוף כל התלושים של כל העסקאות למערך אחד
+  for (const transaction of transactions) {
+    let sortOrder = 0
+
+    // יצירת תלושים של 200₪
+    for (let i = 0; i < transaction.vouchers_200; i++) {
+      allVouchers.push({
+        transaction_id: transaction.id,
+        amount: 200,
+        voucher_code: generateVoucherId(),
+        client_name: transaction.client_name,
+        client_phone: transaction.client_phone,
+        sort_order: sortOrder++
+      })
+    }
+
+    // יצירת תלושים של 150₪
+    for (let i = 0; i < transaction.vouchers_150; i++) {
+      allVouchers.push({
+        transaction_id: transaction.id,
+        amount: 150,
+        voucher_code: generateVoucherId(),
+        client_name: transaction.client_name,
+        client_phone: transaction.client_phone,
+        sort_order: sortOrder++
+      })
+    }
+
+    // יצירת תלושים של 100₪
+    for (let i = 0; i < transaction.vouchers_100; i++) {
+      allVouchers.push({
+        transaction_id: transaction.id,
+        amount: 100,
+        voucher_code: generateVoucherId(),
+        client_name: transaction.client_name,
+        client_phone: transaction.client_phone,
+        sort_order: sortOrder++
+      })
+    }
+
+    // יצירת תלושים של 50₪
+    for (let i = 0; i < transaction.vouchers_50; i++) {
+      allVouchers.push({
+        transaction_id: transaction.id,
+        amount: 50,
+        voucher_code: generateVoucherId(),
+        client_name: transaction.client_name,
+        client_phone: transaction.client_phone,
+        sort_order: sortOrder++
+      })
+    }
+  }
+
+  // אם אין תלושים ליצור - החזר מערך ריק
+  if (allVouchers.length === 0) {
+    return []
+  }
+
+  // שמירה ב-DB במכה אחת (Batch Insert)
+  const { data, error } = await supabase
+    .from('vouchers')
+    .insert(allVouchers)
+    .select()
+
+  if (error) {
+    console.error('Error creating vouchers (batch):', error)
+    throw new Error(`Failed to create vouchers in batch: ${error.message}`)
+  }
+
   return data || []
 }
 
@@ -123,12 +207,12 @@ export async function getVouchersByTransaction(
     .select('*')
     .eq('transaction_id', transactionId)
     .order('sort_order', { ascending: true })
-  
+
   if (error) {
     console.error('Error fetching vouchers:', error)
     return []
   }
-  
+
   return data || []
 }
 
@@ -150,12 +234,12 @@ export async function getVouchersByGroup(
     `)
     .eq('transactions.group_id', groupId)
     .order('created_at', { ascending: false })
-  
+
   if (error) {
     console.error('Error fetching vouchers by group:', error)
     return []
   }
-  
+
   return data || []
 }
 
@@ -169,7 +253,7 @@ export async function getVouchersByGroups(
   groupIds: string[]
 ): Promise<Voucher[]> {
   if (groupIds.length === 0) return []
-  
+
   const { data, error } = await supabase
     .from('vouchers')
     .select(`
@@ -178,11 +262,11 @@ export async function getVouchersByGroups(
     `)
     .in('transactions.group_id', groupIds)
     .order('created_at', { ascending: false })
-  
+
   if (error) {
     console.error('Error fetching vouchers by groups:', error)
     return []
   }
-  
+
   return data || []
 }
