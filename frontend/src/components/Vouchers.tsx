@@ -105,6 +105,7 @@ export function VoucherPrintView({ vouchers }: VoucherPrintViewProps) {
           .voucher-item {
             page-break-inside: avoid;
             page-break-after: auto;
+            margin-bottom: 2mm;
             
             /* קריטי: מאלץ את הדפדפן להדפיס צבעים ורקעים */
             -webkit-print-color-adjust: exact !important;
@@ -293,8 +294,8 @@ export function PrintVouchersModal({
                 <label
                   key={group.id}
                   className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                     }`}
                 >
                   <input
