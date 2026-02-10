@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-rout
 import { supabase } from './utils/supabase'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import { calculateVouchers, formatCurrency } from './utils/calculations'
 import { exportToExcel } from './utils/exportExcel'
 import { createVouchersForTransaction, createVouchersForTransactions, getVouchersByTransaction } from './utils/vouchers'
