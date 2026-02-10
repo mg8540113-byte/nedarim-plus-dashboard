@@ -2024,10 +2024,23 @@ function GroupPage() {
             {filteredTransactions?.map((t: any) => (
               <div key={t.id} className="bg-white rounded-lg p-6 shadow-sm">
                 {/* Header */}
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 relative">
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">{t.client_name}</h3>
                     <p className="text-sm text-gray-500">{formatDate(t.transaction_time)}</p>
+                  </div>
+
+                  {/* כפתור הדפסה ממורכז */}
+                  <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <button
+                      onClick={() => handlePrintTransactionVouchers(t.id)}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-md hover:from-green-600 hover:to-green-700 hover:shadow-lg hover:scale-105 transition-all duration-200 font-semibold text-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      <span>הדפס תלושים</span>
+                    </button>
                   </div>
 
                   <div className="text-left">
@@ -2064,12 +2077,6 @@ function GroupPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-gray-500">תלושים:</p>
-                      <button
-                        onClick={() => handlePrintTransactionVouchers(t.id)}
-                        className="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-1"
-                      >
-                        🖨️ הדפס
-                      </button>
                     </div>
                     {t.has_unused_warning && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
