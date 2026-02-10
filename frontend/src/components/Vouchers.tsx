@@ -27,10 +27,10 @@ export function VoucherTile({ voucher }: VoucherTileProps) {
       <div className="text-2xl font-bold text-blue-900">
         ₪{voucher.amount}
       </div>
-      
+
       {/* קו מפריד */}
       <div className="w-full h-px bg-blue-300 my-1"></div>
-      
+
       {/* מזהה התלוש */}
       <div className="text-xs font-mono text-blue-600 text-center break-all">
         {voucher.voucher_code}
@@ -50,7 +50,7 @@ interface BarcodeProps {
 
 function Barcode({ value, displayValue = true }: BarcodeProps) {
   const barcodeRef = useRef<SVGSVGElement>(null)
-  
+
   useEffect(() => {
     if (barcodeRef.current && window.JsBarcode) {
       try {
@@ -67,12 +67,13 @@ function Barcode({ value, displayValue = true }: BarcodeProps) {
       }
     }
   }, [value, displayValue])
-  
+
   return <svg ref={barcodeRef}></svg>
 }
 
 // ============================================
 // תצוגת הדפסה - 5 תלושים לדף A4
+// עיצוב מותאם אישית עם תמונת רקע
 // ============================================
 
 interface VoucherPrintViewProps {
@@ -81,7 +82,7 @@ interface VoucherPrintViewProps {
 
 export function VoucherPrintView({ vouchers }: VoucherPrintViewProps) {
   return (
-    <div className="print-container">
+    <div className="print-container" dir="rtl">
       <style>{`
         @media print {
           @page {
@@ -95,18 +96,20 @@ export function VoucherPrintView({ vouchers }: VoucherPrintViewProps) {
           }
           
           .print-container {
-            width: 210mm;
-            height: 297mm;
-            padding: 0;
-            margin: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
           }
           
           .voucher-item {
             page-break-inside: avoid;
             page-break-after: auto;
-            height: 59.4mm; /* 297mm / 5 = 59.4mm */
-            width: 100%;
-            box-sizing: border-box;
+            
+            /* קריטי: מאלץ את הדפדפן להדפיס צבעים ורקעים */
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
           
           .no-print {
@@ -116,71 +119,106 @@ export function VoucherPrintView({ vouchers }: VoucherPrintViewProps) {
         
         @media screen {
           .print-container {
-            max-width: 210mm;
+            max-width: 775px;
             margin: 0 auto;
             background: white;
-            padding: 10mm;
+            padding: 20px;
           }
           
           .voucher-item {
-            margin-bottom: 5mm;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
           }
         }
       `}</style>
-      
+
       {vouchers.map((voucher) => (
-        <div key={voucher.id} className="voucher-item border-2 border-gray-300 flex flex-col">
-          {/* כותרת עליונה - לוגו */}
-          <div className="bg-[#F5F1E8] border-b-2 border-gray-300 py-3 text-center">
-            <div className="text-2xl font-bold text-[#1e3a5f]" style={{ fontFamily: 'Arial, sans-serif' }}>
-              🌸 חנות המתנות
-            </div>
+        <div
+          key={voucher.id}
+          className="voucher-item"
+          style={{
+            width: '775px',
+            height: '215px',
+            backgroundImage: 'url(/voucher-bg.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            position: 'relative',
+            fontFamily: "'Heebo', 'Rubik', 'Arial', sans-serif",
+            color: '#333333',
+            lineHeight: 1
+          }}
+        >
+          {/* סכום */}
+          <div style={{
+            position: 'absolute',
+            right: '116px',
+            top: '70px',
+            width: '200px',
+            height: '55px',
+            fontSize: '44px',
+            fontWeight: 700,
+            textAlign: 'right'
+          }}>
+            {voucher.amount} ₪
           </div>
-          
-          {/* כותרת משנית - תלוש זיכוי */}
-          <div className="bg-[#1e3a5f] text-white py-2 text-center border-b-2 border-gray-300">
-            <h2 className="text-xl font-bold">תלוש זיכוי</h2>
+
+          {/* שם לקוח */}
+          <div style={{
+            position: 'absolute',
+            right: '64px',
+            top: '135px',
+            width: '250px',
+            height: '25px',
+            fontSize: '16px',
+            fontWeight: 500,
+            textAlign: 'right',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden'
+          }}>
+            {voucher.client_name}
           </div>
-          
-          {/* סכום הזיכוי */}
-          <div className="border-b-2 border-gray-300 py-3 px-6">
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-gray-700">סכום הזיכוי:</span>
-              <div className="border-2 border-gray-400 px-6 py-1 min-w-[80px] text-center">
-                <span className="text-2xl font-bold text-[#1e3a5f]">{voucher.amount} ₪</span>
-              </div>
-            </div>
+
+          {/* טלפון */}
+          <div style={{
+            position: 'absolute',
+            right: '80px',
+            top: '168px',
+            width: '150px',
+            height: '20px',
+            fontSize: '14px',
+            fontWeight: 400,
+            textAlign: 'right'
+          }}>
+            {voucher.client_phone || ''}
           </div>
-          
-          {/* פרטי הלקוק */}
-          <div className="border-b-2 border-gray-300 py-3 px-6">
-            <div className="text-center mb-2">
-              <span className="text-base font-semibold text-gray-700">── פרטי הלקוח ──</span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">שם מלא:</span>
-                <span className="font-medium text-gray-900 flex-1 text-left mr-4 border-b border-dotted border-gray-400">
-                  {voucher.client_name}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">מספר טלפון:</span>
-                <span className="font-medium text-gray-900 flex-1 text-left mr-4 border-b border-dotted border-gray-400">
-                  {voucher.client_phone || ''}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          {/* ברקוד + ID */}
-          <div className="flex-1 flex flex-col items-center justify-center py-4 px-6">
+
+          {/* ברקוד - קופסה ממורכזת */}
+          <div style={{
+            position: 'absolute',
+            left: '63px',
+            top: '88px',
+            width: '142px',
+            height: '63px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
             <Barcode value={voucher.voucher_code} displayValue={false} />
-            <div className="text-center mt-2">
-              <p className="text-xs font-mono text-gray-600 tracking-wider">
-                {voucher.voucher_code}
-              </p>
-            </div>
+          </div>
+
+          {/* מספר מזהה (ID) */}
+          <div style={{
+            position: 'absolute',
+            left: '66px',
+            top: '155px',
+            width: '135px',
+            height: '20px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            textAlign: 'center'
+          }}>
+            {voucher.voucher_code}
           </div>
         </div>
       ))}
@@ -199,16 +237,16 @@ interface PrintVouchersModalProps {
   onPrint: (groupIds: string[]) => void
 }
 
-export function PrintVouchersModal({ 
-  institutionId, 
-  groups, 
-  onClose, 
-  onPrint 
+export function PrintVouchersModal({
+  institutionId,
+  groups,
+  onClose,
+  onPrint
 }: PrintVouchersModalProps) {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
-  
+
   const institutionGroups = groups.filter(g => g.institution_id === institutionId)
-  
+
   const handleSelectAll = () => {
     if (selectedGroups.length === institutionGroups.length) {
       setSelectedGroups([])
@@ -216,7 +254,7 @@ export function PrintVouchersModal({
       setSelectedGroups(institutionGroups.map(g => g.id))
     }
   }
-  
+
   const handlePrint = () => {
     if (selectedGroups.length === 0) {
       return
@@ -224,7 +262,7 @@ export function PrintVouchersModal({
     onPrint(selectedGroups)
     onClose()
   }
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -232,7 +270,7 @@ export function PrintVouchersModal({
         <div className="px-6 py-4 border-b bg-gradient-to-r from-blue-500 to-blue-600">
           <h2 className="text-xl font-bold text-white">🖨️ בחירת קבוצות להדפסה</h2>
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-4 flex items-center justify-between">
@@ -246,19 +284,18 @@ export function PrintVouchersModal({
               נבחרו: <span className="font-bold text-blue-600">{selectedGroups.length}</span> מתוך {institutionGroups.length}
             </p>
           </div>
-          
+
           <div className="space-y-2">
             {institutionGroups.map((group) => {
               const isSelected = selectedGroups.includes(group.id)
-              
+
               return (
                 <label
                   key={group.id}
-                  className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'border-blue-500 bg-blue-50' 
+                  className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -283,7 +320,7 @@ export function PrintVouchersModal({
             })}
           </div>
         </div>
-        
+
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-gray-50 flex gap-3 justify-end">
           <button
