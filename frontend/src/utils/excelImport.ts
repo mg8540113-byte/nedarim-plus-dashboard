@@ -241,22 +241,54 @@ export async function importOrders(
 
     for (const order of orders) {
         try {
-            // 1. יצירה/עדכון לקוח
-            const { data: clientData, error: clientError } = await supabase
-                .rpc('upsert_client_from_transaction', {
-                    id_num: order.client_id_number,
-                    client_name: order.client_name,
-                    client_phone: order.client_phone || null,
-                    client_email: order.client_email || null
-                })
+            // 1. יצירה/עדכון לקוח (ללא RPC - ישירות)
+            let clientId: string
 
-            if (clientError) {
-                errors.push(`${order.client_name}: שגיאה ביצירת לקוח - ${clientError.message}`)
-                failed++
-                continue
+            // בדיקה אם הלקוח קיים
+            const { data: existingClient } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('id_number', order.client_id_number)
+                .maybeSingle()
+
+            if (existingClient) {
+                // לקוח קיים - עדכון
+                const { error: updateError } = await supabase
+                    .from('clients')
+                    .update({
+                        name: order.client_name,
+                        phone: order.client_phone || null,
+                        email: order.client_email || null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingClient.id)
+
+                if (updateError) {
+                    errors.push(`${order.client_name}: שגיאה בעדכון לקוח - ${updateError.message}`)
+                    failed++
+                    continue
+                }
+                clientId = existingClient.id
+            } else {
+                // לקוח חדש - יצירה
+                const { data: newClient, error: insertError } = await supabase
+                    .from('clients')
+                    .insert({
+                        id_number: order.client_id_number,
+                        name: order.client_name,
+                        phone: order.client_phone || null,
+                        email: order.client_email || null
+                    })
+                    .select('id')
+                    .single()
+
+                if (insertError || !newClient) {
+                    errors.push(`${order.client_name}: שגיאה ביצירת לקוח - ${insertError?.message || 'לא הוחזר ID'}`)
+                    failed++
+                    continue
+                }
+                clientId = newClient.id
             }
-
-            const clientId = clientData
 
             // 2. יצירת עסקה
             const { data: transactionData, error: transactionError } = await supabase
@@ -271,7 +303,7 @@ export async function importOrders(
                     client_phone: order.client_phone,
                     client_id_number: order.client_id_number,
                     net_amount: order.net_amount,
-                    amount_paid: 0, // יוגדר בפונקציה
+                    amount_paid: 0,
                     transaction_time: new Date().toISOString(),
                     nedarim_groupe: 'Excel Import'
                 })
@@ -284,7 +316,7 @@ export async function importOrders(
                 continue
             }
 
-            // 3. הפעלת חישוב (הפונקציה תעדכן אוטומטית)
+            // 3. חישוב תלושים
             const { error: calcError } = await supabase
                 .rpc('calculate_transaction_vouchers', {
                     transaction_id: transactionData.id
