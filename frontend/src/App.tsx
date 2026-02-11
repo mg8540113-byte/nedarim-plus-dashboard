@@ -5,10 +5,10 @@ import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-rout
 import { supabase } from './utils/supabase'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx-js-style'
-import { calculateVouchers, formatCurrency } from './utils/calculations'
+import { formatCurrency } from './utils/calculations'
 import { exportToExcel } from './utils/exportExcel'
-import { createVouchersForTransaction, createVouchersForTransactions, getVouchersByTransaction } from './utils/vouchers'
+import { createVouchersForTransactions, getVouchersByTransaction } from './utils/vouchers'
+import { parseExcelFile, validateOrdersData, importOrders } from './utils/excelImport'
 import { VoucherTile, VoucherPrintView, PrintVouchersModal } from './components/Vouchers'
 import { DebtManagementRoutes } from './pages/DebtManagement'
 import { SyncManagementPage } from './pages/SyncManagement'
@@ -137,93 +137,34 @@ function HomePage() {
     }
   })
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // בדיקת סוג קובץ
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      setExcelError('סוג קובץ לא נתמך. נדרש קובץ Excel (.xlsx או .xls)')
-      return
-    }
+    setExcelError('')
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result
-        const wb = XLSX.read(bstr, { type: 'binary' })
+    try {
+      // שלב 1: פענוח קובץ
+      const rawData = await parseExcelFile(file)
 
-        // בדיקה שיש sheets בקובץ
-        if (!wb.SheetNames || wb.SheetNames.length === 0) {
-          setExcelError('הקובץ לא תקין - אין גיליונות בקובץ Excel')
-          return
-        }
+      // שלב 2: וולידציה לפי מצב - כרגע נניח הזמנות, אוסיף UI לבחירה בהמשך
+      const validation = validateOrdersData(rawData)
 
-        const wsname = wb.SheetNames[0]
-        const ws = wb.Sheets[wsname]
-        const data = XLSX.utils.sheet_to_json(ws)
-
-        // בדיקת קובץ ריק
-        if (data.length === 0) {
-          setExcelError('הקובץ ריק - לא נמצאו שורות')
-          return
-        }
-
-        const firstRow: any = data[0]
-        const requiredColumns = ['שם לקוח', 'סכום ששולם', 'קבוצה']
-
-        // בדיקת עמודות חובה
-        const missingColumns = requiredColumns.filter(col => !(col in firstRow))
-        if (missingColumns.length > 0) {
-          setExcelError(`חסרות עמודות חובה: ${missingColumns.join(', ')}`)
-          return
-        }
-
-        // וולידציה מפורטת לכל שורה
-        for (let i = 0; i < data.length; i++) {
-          const row: any = data[i]
-          const rowNum = i + 2 // +2 כי שורה 1 היא כותרות
-
-          // בדיקת שם לקוח
-          if (!row['שם לקוח'] || String(row['שם לקוח']).trim() === '') {
-            setExcelError(`שורה ${rowNum}: שם לקוח ריק`)
-            return
-          }
-
-          // בדיקת סכום
-          const amount = row['סכום ששולם']
-          if (!amount) {
-            setExcelError(`שורה ${rowNum}: סכום ששולם ריק`)
-            return
-          }
-          if (isNaN(parseFloat(amount))) {
-            setExcelError(`שורה ${rowNum}: סכום ששולם אינו מספר תקין ("${amount}")`)
-            return
-          }
-          if (parseFloat(amount) <= 0) {
-            setExcelError(`שורה ${rowNum}: סכום ששולם חייב להיות גדול מאפס`)
-            return
-          }
-
-          // בדיקת קבוצה
-          if (!row['קבוצה'] || String(row['קבוצה']).trim() === '') {
-            setExcelError(`שורה ${rowNum}: קבוצה ריקה`)
-            return
-          }
-        }
-
-        // הכל תקין!
-        setExcelData(data)
-        setExcelError('')
-        setShowExcelPreviewModal(false)
-        setShowExcelModal(true)
-      } catch (error: any) {
-        setExcelError('שגיאה בקריאת הקובץ: ' + error.message)
+      if (!validation.valid) {
+        setExcelError(validation.errors.join('\n'))
+        return
       }
+
+      // שלב 3: שמירה במצב - נקה Excel Preview Modal ונפתח את ה-Modal הראשי
+      setExcelData(validation.data)
+      setExcelError('')
+      setShowExcelPreviewModal(false)
+      setShowExcelModal(true)
+    } catch (error: any) {
+      setExcelError(error.message)
+    } finally {
+      e.target.value = ''
     }
-    reader.readAsBinaryString(file)
-    // איפוס ה-input
-    e.target.value = ''
   }
 
   const uploadExcelMutation = useMutation({
@@ -274,68 +215,14 @@ function HomePage() {
         throw new Error('יש לבחור או ליצור מוסד וקבוצה')
       }
 
-      // שליפת פרטי הקבוצה
-      const { data: group, error: groupError } = await supabase.from('groups').select('*').eq('id', groupId).single()
-      if (groupError) throw groupError
+      // קריאה לפונקציה חדשה - ייבוא הזמנות
+      const result = await importOrders(excelData as any[], groupId, institutionId)
 
-      // הכנת העסקאות
-      const transactions = excelData.map((row: any) => {
-        const amountPaid = parseFloat(row['סכום ששולם'])
-        const mySubsidy = Math.round(amountPaid * group.my_subsidy_percent) / 100
-        const instSubsidy = Math.round(amountPaid * group.institution_subsidy_percent) / 100
-        const netAmount = amountPaid + mySubsidy + instSubsidy
+      if (result.failed > 0) {
+        throw new Error(`${result.failed} הזמנות נכשלו:\n${result.errors.join('\n')}`)
+      }
 
-        // חישוב תלושים מתוקן - מתוך calculations.ts
-        const vouchers = calculateVouchers(netAmount, {
-          voucher_50_percent: group.voucher_50_percent,
-          voucher_100_percent: group.voucher_100_percent,
-          voucher_150_percent: group.voucher_150_percent,
-          voucher_200_percent: group.voucher_200_percent,
-        })
-
-        // יצירת ID אקראי (11 ספרות + אותיות)
-        const randomId = 'XL' + Math.random().toString(36).substring(2, 11).toUpperCase()
-
-        // תאריך אוטומטי - זמן העלאה למערכת
-        const transactionTime = new Date().toISOString()
-
-        return {
-          nedarim_transaction_id: randomId,
-          client_name: row['שם לקוח'],
-          client_phone: row['טלפון'] || null,
-          client_email: null, // לא נדרש בקובץ Excel
-          client_id_number: row['תעודת זהות'] || null,
-          amount_paid: amountPaid,
-          transaction_time: transactionTime,
-          nedarim_groupe: row['קבוצה'],
-          group_id: groupId,
-          institution_id: institutionId,
-          my_subsidy_amount: mySubsidy,
-          institution_subsidy_amount: instSubsidy,
-          // total_subsidy ו-net_amount מחושבים אוטומטית במסד הנתונים
-          vouchers_50: vouchers.vouchers_50,
-          vouchers_100: vouchers.vouchers_100,
-          vouchers_150: vouchers.vouchers_150,
-          vouchers_200: vouchers.vouchers_200,
-          unused_amount: vouchers.unused_amount,
-          has_unused_warning: vouchers.unused_amount > 0.01,
-          source: 'excel'
-        }
-      })
-
-      // שמירה ב-DB
-      const { data: insertedTransactions, error } = await supabase
-        .from('transactions')
-        .insert(transactions)
-        .select()
-
-      if (error) throw error
-      if (!insertedTransactions) throw new Error('Failed to get inserted transactions')
-
-      // יצירת תלושים פיזיים לכל העסקאות במכה אחת (Batch Insert)
-      await createVouchersForTransactions(insertedTransactions)
-
-      return insertedTransactions.length
+      return result.success
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
@@ -708,33 +595,28 @@ function HomePage() {
                           שם לקוח <span className="text-red-500">*</span>
                         </th>
                         <th className="border border-gray-300 px-4 py-2 text-right font-semibold text-gray-900">
+                          תעודת זהות <span className="text-red-500">*</span>
+                        </th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold text-gray-900">
                           טלפון
                         </th>
                         <th className="border border-gray-300 px-4 py-2 text-right font-semibold text-gray-900">
-                          תעודת זהות
-                        </th>
-                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold text-gray-900">
-                          סכום ששולם <span className="text-red-500">*</span>
-                        </th>
-                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold text-gray-900">
-                          קבוצה <span className="text-red-500">*</span>
+                          סכום <span className="text-red-500">*</span>
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr className="bg-white hover:bg-gray-50">
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">ישראל ישראלי</td>
-                        <td className="border border-gray-300 px-4 py-2 text-gray-700">050-1234567</td>
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">123456789</td>
+                        <td className="border border-gray-300 px-4 py-2 text-gray-700">050-1234567</td>
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">100</td>
-                        <td className="border border-gray-300 px-4 py-2 text-gray-700">כיתה א</td>
                       </tr>
                       <tr className="bg-gray-50 hover:bg-gray-100">
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">שרה כהן</td>
-                        <td className="border border-gray-300 px-4 py-2 text-gray-400 italic">-</td>
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">987654321</td>
+                        <td className="border border-gray-300 px-4 py-2 text-gray-400 italic">-</td>
                         <td className="border border-gray-300 px-4 py-2 text-gray-700">250</td>
-                        <td className="border border-gray-300 px-4 py-2 text-gray-700">כיתה ב</td>
                       </tr>
                     </tbody>
                   </table>
@@ -742,10 +624,13 @@ function HomePage() {
 
                 <div className="mt-4 space-y-2">
                   <p className="text-sm text-gray-600">
-                    <span className="text-red-500 font-bold">*</span> שדות חובה: <strong>שם לקוח, סכום ששולם, קבוצה</strong>
+                    <span className="text-red-500 font-bold">*</span> שדות חובה: <strong>שם לקוח, תעודת זהות, סכום</strong>
                   </p>
                   <p className="text-sm text-gray-600">
-                    ℹ️ שדות אופציונליים: טלפון, תעודת זהות
+                    ℹ️ שדות אופציונליים: טלפון
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    📋 <strong>לפני העלאה:</strong> תבחר למוסד ולקבוצה איזה לשייך את ההזמנות
                   </p>
                   <p className="text-sm text-gray-600">
                     📅 התאריך והשעה יירשמו אוטומטית בזמן ההעלאה
