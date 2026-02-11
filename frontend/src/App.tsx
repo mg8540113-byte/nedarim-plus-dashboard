@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import { formatCurrency } from './utils/calculations'
 import { exportToExcel } from './utils/exportExcel'
 import { createVouchersForTransactions, getVouchersByTransaction } from './utils/vouchers'
-import { parseExcelFile, validateOrdersData, importOrders } from './utils/excelImport'
+import { parseExcelFile, validateOrdersData, validatePaymentsData, importOrders, importPayments } from './utils/excelImport'
 import { VoucherTile, VoucherPrintView, PrintVouchersModal } from './components/Vouchers'
 import { DebtManagementRoutes } from './pages/DebtManagement'
 import { SyncManagementPage } from './pages/SyncManagement'
@@ -31,6 +31,7 @@ function HomePage() {
   const [newName, setNewName] = useState('')
   const [excelData, setExcelData] = useState<any[]>([])
   const [excelError, setExcelError] = useState('')
+  const [importMode, setImportMode] = useState<'orders' | 'payments'>('orders')
   const [selectedInstitution, setSelectedInstitution] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
   const [newInstitutionName, setNewInstitutionName] = useState('')
@@ -147,8 +148,10 @@ function HomePage() {
       // שלב 1: פענוח קובץ
       const rawData = await parseExcelFile(file)
 
-      // שלב 2: וולידציה לפי מצב - כרגע נניח הזמנות, אוסיף UI לבחירה בהמשך
-      const validation = validateOrdersData(rawData)
+      // שלב 2: וולידציה לפי מצב
+      const validation = importMode === 'orders'
+        ? validateOrdersData(rawData)
+        : await validatePaymentsData(rawData)
 
       if (!validation.valid) {
         setExcelError(validation.errors.join('\n'))
@@ -169,6 +172,18 @@ function HomePage() {
 
   const uploadExcelMutation = useMutation({
     mutationFn: async () => {
+      // מצב תשלומים - לא צריך מוסד/קבוצה
+      if (importMode === 'payments') {
+        const result = await importPayments(excelData as any[])
+
+        if (result.failed > 0) {
+          throw new Error(`${result.failed} תשלומים נכשלו:\n${result.errors.join('\n')}`)
+        }
+
+        return result.success
+      }
+
+      // מצב הזמנות - דורש מוסד+קבוצה
       let groupId = selectedGroup
       let institutionId = selectedInstitution
 
@@ -215,7 +230,7 @@ function HomePage() {
         throw new Error('יש לבחור או ליצור מוסד וקבוצה')
       }
 
-      // קריאה לפונקציה חדשה - ייבוא הזמנות
+      // קריאה לפונקציה - ייבוא הזמנות
       const result = await importOrders(excelData as any[], groupId, institutionId)
 
       if (result.failed > 0) {
@@ -228,7 +243,8 @@ function HomePage() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['institutions'] })
       queryClient.invalidateQueries({ queryKey: ['groups'] })
-      toast.success(`${count} עסקאות נוספו בהצלחה!`)
+      queryClient.invalidateQueries({ queryKey: ['client_payments'] })
+      toast.success(`${count} ${importMode === 'orders' ? 'עסקאות' : 'תשלומים'} נוספו בהצלחה!`)
       setShowExcelModal(false)
       setExcelData([])
       setSelectedInstitution('')
@@ -565,8 +581,42 @@ function HomePage() {
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full p-6">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                העלאת קובץ Excel
+                העלאת קובץ Excel - {importMode === 'orders' ? 'הזמנות' : 'תשלומים'}
               </h3>
+
+              {/* Import Mode Selector */}
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">בחר סוג ייבוא:</h4>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="orders"
+                      checked={importMode === 'orders'}
+                      onChange={(e) => setImportMode('orders')}
+                      className="w-5 h-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-800 font-medium group-hover:text-blue-700">
+                      📦 ייבוא הזמנות
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="payments"
+                      checked={importMode === 'payments'}
+                      onChange={(e) => setImportMode('payments')}
+                      className="w-5 h-5 text-green-600 focus:ring-2 focus:ring-green-500"
+                    />
+                    <span className="text-gray-800 font-medium group-hover:text-green-700">
+                      💰 ייבוא תשלומים
+                    </span>
+                  </label>
+                </div>
+              </div>
 
               {/* Error Display */}
               {excelError && (
